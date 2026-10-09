@@ -8,10 +8,12 @@ on Nexus Mods; while those uploads are under review, the complete packages are p
 here as GitHub Releases. When the Nexus pages are live again, both stay in sync — the files
 are byte-identical.
 
-| Mod | Nexus page | GitHub download |
+| Mod | Direct download | Nexus page |
 | --- | --- | --- |
-| **FS4 MFG** — Fallout 4 | https://www.nexusmods.com/fallout4/mods/109634 | [Releases → `fs4-mfg-*`](../../releases) |
-| **SkyrimSE MFG** — Skyrim SE | https://www.nexusmods.com/skyrimspecialedition/mods/194020 | [Releases → `skyrimse-mfg-*`](../../releases) |
+| **FS4 MFG** — Fallout 4 | [FS4-MFG-2026-10-05.zip](https://github.com/jinbulo/MFG-DLSS5/releases/download/fs4-mfg-2026.10.05/FS4-MFG-2026-10-05.zip) · [release notes](https://github.com/jinbulo/MFG-DLSS5/releases/tag/fs4-mfg-2026.10.05) | https://www.nexusmods.com/fallout4/mods/109634 |
+| **SkyrimSE MFG** — Skyrim SE | [SkyrimSE-MFG-2026-10-05.zip](https://github.com/jinbulo/MFG-DLSS5/releases/download/skyrimse-mfg-2026.10.05/SkyrimSE-MFG-2026-10-05.zip) · [release notes](https://github.com/jinbulo/MFG-DLSS5/releases/tag/skyrimse-mfg-2026.10.05) | https://www.nexusmods.com/skyrimspecialedition/mods/194020 |
+
+All releases: https://github.com/jinbulo/MFG-DLSS5/releases
 
 ---
 
@@ -21,8 +23,8 @@ Open the [Releases](../../releases) page and pick the build you need.
 
 | Release | Package | Size | SHA-256 |
 | --- | --- | --- | --- |
-| `fs4-mfg-2026.10.05` | `FS4-MFG-2026-10-05.zip` | 159.6 MB | `45EA045806B1648B6538B3A37C61337E2DB259FB8DBF7566FC78D11CFF9EAB29` |
-| `skyrimse-mfg-2026.10.05` | `SkyrimSE-MFG-2026-10-05.zip` | 154.9 MB | `28066A52AE69A68592ED352AF4F9F7EAC27A2F0CE4DD3863681AC1D664971642` |
+| [`fs4-mfg-2026.10.05`](https://github.com/jinbulo/MFG-DLSS5/releases/tag/fs4-mfg-2026.10.05) | `FS4-MFG-2026-10-05.zip` | 159.6 MB | `45EA045806B1648B6538B3A37C61337E2DB259FB8DBF7566FC78D11CFF9EAB29` |
+| [`skyrimse-mfg-2026.10.05`](https://github.com/jinbulo/MFG-DLSS5/releases/tag/skyrimse-mfg-2026.10.05) | `SkyrimSE-MFG-2026-10-05.zip` | 154.9 MB | `28066A52AE69A68592ED352AF4F9F7EAC27A2F0CE4DD3863681AC1D664971642` |
 
 The same hash is printed in each release's description and inside the archive as
 `RELEASE-MANIFEST.txt`. Every file inside both archives also has its own SHA-256 there.

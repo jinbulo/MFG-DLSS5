@@ -4,5 +4,5 @@
 *.rar
 
 # Local scratch
-tools/_local/
+tools/
 *.log
