@@ -1,0 +1,242 @@
+[size=6][b]SkyrimSE MFG — Real Multi-Frame Generation + DLSS 5 Neural Rendering for Skyrim Special Edition[/b][/size]
+
+[size=5][b]Description[/b][/size]
+
+Skyrim Special Edition has neither DLSS nor frame generation. This mod adds both, on top of your existing [b]ENB[/b] setup, without touching it.
+
+It takes the window over with its own D3D12 flip swapchain and drives NVIDIA Streamline / DLSS-G itself, so the game gets [b]genuine multi-frame generation[/b] (2x / 3x / 4x / 5x / 6x) even though the engine knows nothing about DLSS. The in-between frames are produced by the driver's frame generator, not smeared out by a post-process filter.
+
+Upscaling and DLSS 5 neural rendering come from [b]dlss5-feed[/b] + [b]renodx-dlss5 8.5[/b], and this mod feeds them the [b]engine's own TAA motion vectors[/b] — the same R16G16_FLOAT buffer Skyrim uses for its own TAA, published straight into ReShade's MOTION_VECTOR by [b]FO4ReShadeHelper[/b] — instead of optical flow. It also hands over the game's real depth buffer (converted to R32_FLOAT) and the engine's own camera pair, so neither the upscaler nor the frame generator has to guess anything. In practice: motion reads exactly [b]0 px while you stand still[/b] and tens of px while you turn, with no outliers.
+
+The UI is handled properly too: [b]ui_exact[/b] lifts the HUD, compass and subtitles out before DLAA runs and composites them back afterwards, so they keep their original pixels while the world still gets DLAA. No mask, no threshold, no edge bleed — any HUD, any resolution, translucency included.
+
+Nothing in your game folder is modified permanently: the installer backs up everything it overwrites, ENB is never touched, and the layer turns off with one double-click.
+
+[b]Two builds have been tested end to end — these are the configurations we can vouch for:[/b]
+[list]
+[*][b]Skyrim SE 1.5.97[/b] — SKSE64 [b]2.0.20[/b] + ENB [b]0.505[/b]. This is the longest-validated baseline (takeover, 4x, ui_exact, and both motion-vector paths).
+[*][b]Skyrim SE 1.7.104 (AE)[/b] — SKSE64 [b]2.3.1[/b] + ENB [b]0.505[/b]. Verified: takeover OK, 4x (21 → 85 fps on screen), motion vectors 100% non-zero (mean |mv| 7.56 px). On AE the motion vectors come from the engine buffer via ENB; this mod's own camera-matrix fallback path stays 1.5.97-calibrated and does not engage there.
+[/list]
+
+[b]Running a different build?[/b] The two above are what has been tested end to end. Everything else is untested rather than blocked: install the ENB and the SKSE64 that match your build, keep the window borderless, keep other frame-generation layers off, and try it. If something misbehaves, post the four logs and we can tell you exactly where it stands.
+
+If you want the exact configuration that has been validated the longest, run 1.5.97 — the archive ships [b]DOWNGRADE-to-1.5.97.md[/b] with the complete Steam console recipe if Steam has already put you on AE.
+
+[b]New in this release (2026-10-05)[/b]
+[list]
+[*]Installer is now [b]bilingual (EN/CN)[/b] and finds your game by itself: drag &amp; drop → script folder → last used path → Bethesda registry → [b]every Steam library on the machine[/b] (it parses LIBRARYFOLDERS.VDF, so a second Steam drive is found too). Multiple installs are listed and you pick one.
+[*][b]Version gate:[/b] the installer reads SKYRIMSE.EXE first. Anything that is not 1.5.97 prints a warning and asks you to type yes; anything else cancels and [b]changes nothing[/b].
+[*]Automatic elevation when the target folder is protected (e.g. under C:\PROGRAM FILES).
+[*]New [b]launch-skse.bat[/b] — one double-click to start through SKSE64_LOADER.EXE; the status report now also tells you whether the script extender is present.
+[*][b]ReShade.ini fixed:[/b] screenshot key is [b]F10[/b], screenshots are written to the [b]game root[/b], the SCREENSHOT section is complete, and the author's local paths are gone.
+[*][b]ENB is now correctly documented as mandatory[/b] (see the measured table below) — the earlier "ENB optional" wording was wrong and has been removed from every document.
+[*]AE (1.7.104) support verified, plus the bundled [b]DOWNGRADE-to-1.5.97.md[/b].
+[/list]
+
+[line]
+
+[size=5][b]Installation instructions[/b][/size]
+
+[b]Step 0 — set up the game first[/b]
+
+[list=1]
+[*]Install Skyrim Special Edition and decide which build you are on: [b]1.5.97[/b] or [b]1.7.104 (AE)[/b]. Check the version under SKYRIMSE.EXE → PROPERTIES → DETAILS.
+[*]Install [b]SKSE64[/b] into the game root (the folder that contains SKYRIMSE.EXE). The version must match the game: [b]2.0.20[/b] for 1.5.97, [b]2.3.1[/b] for 1.7.104. Put the matching SKSE64_LOADER.EXE [i]and[/i] version dll (SKSE64_1_5_97.DLL / SKSE64_1_7_104.DLL) there, and copy DATA\SCRIPTS\*.PEX into DATA\SCRIPTS\. Do not mix versions — the loader refuses to start if they do not match.
+[*]Install [b]ENB[/b] in the game root: from [url=https://enbdev.com/]enbdev.com[/url] → TES Skyrim SE → [b]0.505[/b]. Copy the wrapper files in (D3D11.DLL, D3DCOMPILER_46E.DLL, ENBSERIES.INI, ENBLOCAL.INI and the .FX/.BMP files). This mod uses ENB as its display host and never overwrites any of those files.
+[*][b]Turn ENB's FPS limiter off:[/b] open ENBLOCAL.INI and set ENABLEFPSLIMIT=FALSE. Several ENB builds ship ENABLEFPSLIMIT=TRUE with FPSLIMIT=61.0; that pins your frame rate and makes the mod look like it does nothing.
+[*]In-game: set [b]Borderless[/b] windowed, and turn [b]NVIDIA Smooth Motion[/b] off (NVIDIA app / control panel). It is frame generation too, and the two will fight each other. Also make sure no other frame-generation tool is active — in particular [b]ENBFrameGeneration.dll[/b] must stay disabled in your mod manager: two layers taking the window over is one too many.
+[/list]
+
+[b]Borderless mode — non-MO2 users[/b] — edit DOCUMENTS\MY GAMES\SKYRIM SPECIAL EDITION\SKYRIMPREFS.INI:
+[code][Display]
+bBorderless=1
+bFull Screen=0[/code]
+[b]MO2 users:[/b] MO2 runs from the [i]profile's[/i] ini files, not the ones in Documents. Set it in MO2\PROFILES\<YOUR PROFILE>\SKYRIMPREFS.INI.
+
+[b]Step 1 — install this mod. Pick ONE of the two paths:[/b]
+
+[b]A. No mod manager (recommended — the script backs everything up)[/b]
+[list=1]
+[*]Extract this archive to a folder [b]outside[/b] your game folder (the Desktop is fine).
+[*]Run [b]install.bat[/b], or drag your Skyrim SE folder onto it.
+[*]It finds the game folder, reads SKYRIMSE.EXE's version first, then copies the mod in while [b]backing up every file it overwrites[/b] into MFG-BACKUP-&lt;TIMESTAMP&gt;\. In a protected folder it re-opens itself as administrator.
+[/list]
+
+[b]B. Mod Organizer 2[/b]
+[list=1]
+[*]Copy everything in this archive into your MO2 OVERWRITE\ROOT (that folder is your game root). The .BAT/.PS1 files are ignored in this path — leave them in the archive.
+[*]MO2 users do not need INSTALL.BAT and do not get the automatic backup — keep your own copy of anything you overwrite.
+[/list]
+
+[b]Not needed:[/b] this mod does [b]not[/b] use a DATA\SKSE\PLUGINS plugin. If you are looking for a missing .dll in DATA\SKSE\PLUGINS — there is none, that is by design. (Some third-party repacks ship a settings ini in a folder called "修复 MFG"; that is the unrelated "Mfg Fix" expression mod, not this one.)
+
+[b]Step 2 — launch[/b]: SKSE64_LOADER.EXE is the recommended entry point — or double-click the bundled LAUNCH-SKSE.BAT, which does the same thing. Starting from Steam works too: just make sure Steam actually launches the SKSE loader, and that Steam does not update the game to a build your SKSE64 does not match. On an older build such as 1.5.97, set [i]Properties → Updates → Only update this game when I launch it[/i] so a silent update cannot move you off the SKSE version you matched. (SKYRIMSELAUNCHER.EXE does not load SKSE.)
+
+The layer takes the window over a moment after the DLSS feed is ready; SKYRIMMFG.LOG shows it as TAKEOVER | 到达接管点 .... A small on-screen frame counter is on by default — STATS_WINDOW=0 hides it, and ENABLED=0 makes the whole layer passive without moving any file.
+
+[b]Verify it is working — three lines:[/b]
+[list]
+[*]SKYRIMMFG.LOG — TAKEOVER / DONE | 已接管窗口, and the multiplier you asked for
+[*]RESHADE.LOG — NR-VERDICT ... STATE=ENGAGED
+[*]DLSS5-FEED.LOG — MV PROBE ... MEAN |MV| reads tens of px while you move, [b]100% non-zero[/b]
+[/list]
+
+[b]Turning it off / removing it[/b]
+[list]
+[*][b]mfg-disable.bat[/b] — turn the layer off for now (fully reversible). It only renames this layer's entry points to .OFF — DXGI.DLL, SKYRIMMFG.ADDON64, DLSS5-FEED.ADDON64, RENODX-DLSS5.ADDON64, FO4RESHADEHELPER.ADDON64. Nothing is deleted, your ENB keeps running, and the game immediately returns to its normal present path.
+[*][b]mfg-enable.bat[/b] — turn it back on.
+[*][b]restore.bat[/b] — uninstall: put the backed-up originals back and delete what this pack added. It keeps the backup folder; delete that yourself once you are happy.
+[/list]
+After installing with INSTALL.BAT these scripts are also copied into &lt;GAME&gt;\MFG-TOOLS\, so you never have to find the archive again.
+
+[b]Where are the logs?[/b] All in the [b]game root folder[/b]: [b]SkyrimMFG.log[/b] (takeover, frame generation, ui_exact, motion-vector source and MVSTATS), [b]dlss5-feed.log[/b] (work resolution, MV probe, depth probe, GPU cost), [b]ReShade.log[/b] (ReShade + RenoDX, NR-VERDICT), [b]sl.log[/b] (Streamline / DLSS-G). Attach all four when asking for help.
+
+[b]Switching game version[/b]: [b]DOWNGRADE-to-1.5.97.md[/b] ships in the archive with the Steam console depot commands (steam://open/console, three DOWNLOAD_DEPOT lines, copy the results over the game folder, swap SKSE to 2.0.20). To go back up, use Steam's "Verify integrity of game files" and put SKSE 2.3.1 back.
+
+[line]
+
+[size=5][b]Main features[/b][/size]
+
+[list]
+[*][b]Real frame generation, 1x–6x.[/b] MFG_FRAMES selects 2x / 3x / 4x / 5x / 6x (1 = 2x, 2 = 3x, 3 = 4x … 5 = 6x). Verified in game: ~90–108 fps on screen against ~23–27 fps application-side at 2560x1600 (4x).
+[*][b]Real motion vectors — no optical flow.[/b] The engine's TAA motion buffer (R16G16_FLOAT) is published into ReShade's MOTION_VECTOR by FO4RESHADEHELPER and handed to DLSS-G and to the neural renderer. One writer, constant units, no double-peak, no ghosting guesswork.
+[*][b]Real depth and real camera.[/b] The game's own depth buffer is converted to R32_FLOAT; the camera pair comes from the engine's previous-frame world matrix, not from an estimated pose.
+[*][b]DLSS 5 neural rendering[/b] through [b]renodx-dlss5 8.5[/b], wired so its compute-state shadow lands on the right command-list world (WAIT_DLSS_FEED=1 in SKYRIMMFG.INI). Do not turn that off.
+[*][b]The UI stays pixel-exact (UI_EXACT, on by default).[/b] HUD, compass and subtitles are lifted out before DLAA and composited back, so they keep their original pixels while the world still gets DLAA. Turn it off with UI_EXACT=0 if you want to compare.
+[*][b]Verified end to end:[/b] in a full session the whole path ran on 100% of frames (UIEXACT | 累计: 帧 4183，有A 4183，改写 4183，合成 4183), MFG reported 4x actual = 4x requested, NR-VERDICT STATE=ENGAGED RATIO=0.9993, and the log held zero errors.
+[*][b]Two numbers that must match your game.[/b] The camera model uses a horizontal FOV of 77° (CAM_FOV_DEG=77) and Skyrim's default near plane of 15 units. If you changed your FOV, set CAM_FOV_DEG to your actual horizontal FOV — the log prints an FOV 判据 line that helps you pin it down from an in-place turn frame. If frame generation looks "off" or motion smears, check this first.
+[*][b]Configurable HUD handling.[/b] UI_EXACT and UI_EXACT_RTV control the exact-UI path; HUDLESS_TAG accepts only 0/1 (anything ≥2 is clamped back to 1 — the 2/3 path was measured twice, made things worse, and has been removed from the code). The HUD [i]inside generated frames[/i] is interpolated by DLSS-G itself — that part is by design.
+[*][b]One-line off, separate log, on-screen frame counter[/b] (STATS_WINDOW=1, ENABLED=0 for a passive layer without renaming anything).
+[*][b]Safe by construction.[/b] Nothing in DATA\ is touched, ENB's D3D11.DLL / ENBSERIES.INI / ENBLOCAL.INI are neither shipped nor overwritten, and every install is preceded by an automatic backup.
+[/list]
+
+[line]
+
+[size=5][b]Requirements[/b][/size]
+
+[list]
+[*][b]Game —[/b] Skyrim Special Edition [b]1.5.97[/b] or [b]1.7.104 (AE)[/b]. These two are the tested builds; on anything else, install the ENB and SKSE64 that match your build and give it a try.
+[*][b]Script extender —[/b] SKSE64 [b]2.0.20[/b] for 1.5.97, SKSE64 [b]2.3.1[/b] for 1.7.104. Version must match the game exactly.
+[*][b]Host — ENB is REQUIRED[/b] (validated with ENB [b]0.505[/b] for Skyrim SE, from [url=https://enbdev.com/]enbdev.com[/url]). Not bundled — download it yourself. ENB is what makes the engine publish the motion vectors this mod feeds to DLSS-G. Measured on the same install with the same add-on, only ENB added:
+[list]
+[*]no ENB → takeover and 4x still work, but the motion-vector feed reads 0.000 px, 0% non-zero and generated frames smear when you move
+[*]with ENB 0.505 → [b]100% non-zero[/b], mean |mv| 7.56 px
+[/list]
+Your own ENB and preset stay exactly as they are; this pack never overwrites them.
+[*][b]Window mode — borderless windowed is mandatory.[/b] The layer builds its own swapchain on the game's window and DXGI refuses that in exclusive fullscreen (CreateSwapChainForHwnd → 0x887a0001, then GIVEUP after three tries). MO2 users: change it in the profile's SKYRIMPREFS.INI, not the one in Documents.
+[*][b]GPU —[/b] NVIDIA [b]RTX 40-series or newer[/b]. DLSS-G will not load on anything older. Developed and verified on an RTX 5060 Laptop (8 GB).
+[*][b]Driver —[/b] no hard minimum.
+[*][b]ReShade —[/b] 6.8, bundled as DXGI.DLL. Do not mix in another ReShade install.
+[*][b]OS —[/b] Windows 10 / 11, 64-bit.
+[*][b]Must be off —[/b] NVIDIA Smooth Motion, ENBFRAMEGENERATION.DLL, and any other frame-generation or upscaling layer (OptiScaler, Lossless Scaling…). Only one presentation layer can own the window.
+[*][b]Mod manager —[/b] optional. MO2 (copy into OVERWRITE\ROOT) or no manager at all (run INSTALL.BAT).
+[/list]
+
+[b]Performance.[/b] Neural rendering is the one big cost: about [b]24 ms per frame, 38–45% of the frame[/b]. If your application-side frame rate drops below ~15 fps, either lower MFG_FRAMES to 2 (3x) or set NRRESOLUTIONSCALE=0.5 in RESHADE.INI (that takes neural rendering down to roughly 7 ms). On an 8 GB card the full setup also sits near the VRAM limit at 2560x1600. Remember that the on-screen counter counts [i]displayed[/i] frames including generated ones — input latency follows the lower, application-side number in the log.
+
+[line]
+
+[size=5][b]Shout outs[/b][/size]
+
+[list]
+[*][b]crosire[/b] — ReShade, the add-on API this is built on.
+[*][b]Boris Vorontsov[/b] — ENB, which this mod uses as its display host.
+[*][b]NVIDIA[/b] — Streamline and the NGX runtimes that make DLSS-G possible.
+[*][b]Lecram[/b] — RenoDX DLSS5, the neural-rendering engine this project feeds.
+[*][b]The dlss5-feed / dlss5-lab-overlay authors[/b] — the upscaler and guide bridge.
+[*][b]Afzaal[/b] — LumeniteFX Kernel (shipped here with its pre-pass stubbed out; the original file is included next to it as LUMENITE_KERNEL.FX.ORIGINAL).
+[*][b]Vortigern[/b] — VORT motion tools (MIT).
+[*][b]doodlum (StreamlineForENB) and the Community Shaders team[/b] — the "hook the engine's motion-vector render target" idea that this mod's motion-vector path is modelled on.
+[*][b]The SKSE team[/b] — skse64, without which none of this loads.
+[/list]
+
+[size=5][b]Permissions[/b][/size]
+Ask before re-uploading or including this in another collection. [b]ENB is not bundled[/b] — download it from enbdev.com yourself, and do not re-post ENB's binaries anywhere. All third-party components remain under their authors' own terms.
+
+[line]
+
+[size=5][b]中文版（速览）[/b][/size]
+
+[b]Description（简介）[/b]
+
+《上古卷轴5 特别版》既没有 DLSS 也没有帧生成。这个 mod 在你[b]现有 ENB 之上[/b]把两样都加上，而且不改动你的 ENB。
+
+它在游戏窗口上自建一条 D3D12 交换链，自己驱动 NVIDIA Streamline / DLSS-G，于是游戏在完全不支持 DLSS 的情况下拿到了[b]真正的多帧生成[/b]（2× / 3× / 4× / 5× / 6×）—— 中间帧是驱动级帧生成器产出的，不是后处理滤镜糊出来的。
+
+DLSS / DLAA 上采样与 DLSS 5 神经渲染由 [b]dlss5-feed[/b] + [b]renodx-dlss5 8.5[/b] 提供，而本 mod 把[b]引擎真实的 TAA 运动矢量[/b]（那张 R16G16_FLOAT 缓冲，由 [b]FO4ReShadeHelper[/b] 直接发布进 ReShade 的 MOTION_VECTOR）喂给它们，而不是让它们去猜光流；同时把真实深度缓冲（转成 R32_FLOAT）与引擎自己的相机位姿一并交出去。[b]实际效果：静止时运动量精确为 0 px，转身时数十 px，没有离群值。[/b]
+
+UI 也做了处理：[b]ui_exact[/b] 在 DLAA 之前把 HUD、罗盘和字幕摘出来、之后原样合回，于是它们保持自己的像素，而风景照旧吃 DLAA。没有掩膜、没有阈值、没有边缘泄漏 —— 任何 HUD、任何分辨率、半透明也精确。
+
+[b]已实测跑通的是下面两个组合（其它版本未测试：装好对应版本的 ENB 与 SKSE64 后可自行尝试）：[/b]
+[list]
+[*]Skyrim SE [b]1.5.97[/b] → SKSE64 [b]2.0.20[/b] + ENB [b]0.505[/b]（验证最久的基线）
+[*]Skyrim SE [b]1.7.104 (AE)[/b] → SKSE64 [b]2.3.1[/b] + ENB [b]0.505[/b]（实测接管成功、4×、21→85 fps、运动矢量 100% 非零 / 7.56 px。AE 上的运动矢量来自 ENB 路径；本层自带的「相机矩阵兜底」只按 1.5.97 标定，在 AE 上不生效）
+[/list]
+想要最稳的组合就用 1.5.97；包内的 [b]DOWNGRADE-to-1.5.97.md[/b] 有完整的 Steam depot 降级步骤。
+
+[b]本版更新（2026-10-05）：[/b]安装脚本改中英双语；自动查找游戏（含所有 Steam 库）；版本闸门（非 1.5.97 会警告并要求输入 yes）；受保护目录自动提权；新增 LAUNCH-SKSE.BAT；RESHADE.INI 修好（截图键 F10、存游戏根目录、去掉作者本机路径）；把「ENB 可选」的旧说法纠正为[b]必需[/b]；补上 AE 支持与降级文档。
+
+[b]Installation instructions（安装）[/b]
+
+0. 先装游戏（1.5.97 或 1.7.104），装配对版本的 [b]SKSE64[/b]（2.0.20 / 2.3.1，loader 与版本 dll 都放进游戏根目录，DATA\SCRIPTS\*.PEX 覆盖进 DATA\SCRIPTS\）。
+1. 装 [b]ENB 0.505[/b]（enbdev.com → TES Skyrim SE），wrapper 文件放进游戏根目录；把 ENBLOCAL.INI 里的 ENABLEFPSLIMIT 改成 FALSE（不然帧率会被钉在 61）。
+2. 设[b]无边框窗口[/b]（BBORDERLESS=1 + BFULL SCREEN=0）。不用 MO2 就改 文档\MY GAMES\SKYRIM SPECIAL EDITION\SKYRIMPREFS.INI；用 MO2 改 [b]profile 里的[/b] SKYRIMPREFS.INI。
+3. 关掉 [b]NVIDIA Smooth Motion[/b]，并确认 ENBFRAMEGENERATION.DLL 处于禁用、没有别的插帧工具在跑。
+4. 安装本 mod，两条路选一条：
+[list]
+[*][b]A（推荐）不用管理器：[/b]把压缩包解到[b]游戏目录之外[/b]，双击 INSTALL.BAT（或把游戏目录拖上去）。它会自己找目录、核对版本、把会被覆盖的文件先备份到 MFG-BACKUP-&lt;时间戳&gt;\，再复制进去；写不进去会自动提权。
+[*][b]B 用 MO2：[/b]把包内文件复制进 MO2\OVERWRITE\ROOT（= 游戏根目录），脚本可以不管。
+[/list]
+5. [b]本 mod 没有 DATA\SKSE\PLUGINS 插件[/b]，找不到 .dll 是正常的。
+6. 启动：推荐 SKSE64_LOADER.EXE（或包里的 LAUNCH-SKSE.BAT，双击即可）。直接点 Steam 的「开始游戏」也可以 —— 只要让 Steam 实际拉起的是 SKSE 的 loader。1.5.97 这类旧版本建议在 属性 → 更新 里选「仅在我启动此游戏时更新」，防止被自动更新掉。SKYRIMSELAUNCHER.EXE 不会加载 SKSE。
+
+[b]验证是否正常（三行）：[/b]SKYRIMMFG.LOG 里出现 TAKEOVER / DONE；RESHADE.LOG 里 NR-VERDICT ... STATE=ENGAGED；DLSS5-FEED.LOG 里 MV PROBE 移动时有几十 px 且 [b]100% 非零[/b]。
+
+[b]停用 / 启用 / 卸载：[/b]MFG-DISABLE.BAT 暂时关（只把入口文件改成 .OFF，不删任何东西，ENB 照常运行）；MFG-ENABLE.BAT 开回来；RESTORE.BAT 彻底卸载并把备份放回。装过 INSTALL.BAT 后这些脚本也会被复制到 &lt;游戏目录&gt;\MFG-TOOLS\。
+
+[b]日志（排错时一起发）：[/b]都在[b]游戏根目录[/b]：SKYRIMMFG.LOG（接管、帧率/倍率、ui_exact、运动矢量与 MVSTATS）、DLSS5-FEED.LOG（工作分辨率、MV 探针、深度探针、GPU 耗时）、RESHADE.LOG（ReShade 与 RenoDX、NR-VERDICT）、SL.LOG（Streamline / DLSS-G）。
+
+[b]Main features（核心功能）[/b]
+[list]
+[*][b]真正的帧生成，1×–6×。[/b]MFG_FRAMES：1 = 2×，2 = 3×，3 = 4× … 5 = 6×。实机验证：2560×1600 下屏幕约 90–108 fps、应用侧约 23–27 fps（4×）。
+[*][b]真运动矢量（不是光流）。[/b]引擎 TAA 运动缓冲（R16G16_FLOAT）由 FO4RESHADEHELPER 发布进 ReShade 的 MOTION_VECTOR，再交给 DLSS-G 与神经渲染。单写者、恒定单位、无双峰。
+[*][b]真深度 + 真相机。[/b]游戏自己的深度缓冲转成 R32_FLOAT；相机对来自引擎自己的上一帧世界矩阵。
+[*][b]DLSS 5 神经渲染[/b]，接 [b]renodx-dlss5 8.5[/b]，用 WAIT_DLSS_FEED=1 把它的 compute-state 影子放到正确的命令列表世界上，别关。
+[*][b]UI 保持原像素（UI_EXACT，默认开启）。[/b]HUD、罗盘、字幕不进 DLAA；想对比可设 UI_EXACT=0。
+[*][b]整链实测：[/b]一局里 100% 的帧跑完整条链（UIEXACT | 累计: 帧 4183，有A 4183，改写 4183，合成 4183），实测倍数 = 自报倍数 = 4×，NR-VERDICT STATE=ENGAGED RATIO=0.9993，日志零错误。
+[*][b]两个必须与你游戏一致的数字。[/b]相机模型按水平 FOV 77°（CAM_FOV_DEG=77）与默认近平面 15 单位工作。改过视野就把 CAM_FOV_DEG 改成实际水平 FOV —— 日志里的 FOV 判据 行能帮你从「原地转身」的帧里反推。插帧发糊时先查这个值。
+[*][b]HUD 相关开关。[/b]UI_EXACT / UI_EXACT_RTV 控制精确 UI 通路；HUDLESS_TAG 只接受 0/1（写 ≥2 会被钳回 1，2/3 那条路实测两次都是负收益，代码已删）。生成帧里的 HUD 会被 DLSS-G 自己插值 —— 那是设计如此。
+[*][b]一行停用、独立日志、屏上帧数读数[/b]（STATS_WINDOW=1；ENABLED=0 让整层被动而不改文件名）。
+[*][b]安全：[/b]不动 DATA\，不附带也不覆盖 ENB 的 D3D11.DLL / ENBSERIES.INI / ENBLOCAL.INI，安装前一定先备份。
+[/list]
+
+[b]Requirements（需求）[/b]
+[list]
+[*]游戏 —— Skyrim SE [b]1.5.97[/b] 或 [b]1.7.104 (AE)[/b]（这两个是实测版本；其它版本未测试，装好对应版本的 ENB 与 SKSE64 后可自行尝试）
+[*]脚本扩展 —— SKSE64 [b]2.0.20[/b]（1.5.97）/[b]2.3.1[/b]（1.7.104），必须配对
+[*]宿主 —— [b]必须装 ENB[/b]（本 mod 用 0.505 验证；enbdev.com 自行下载，本包不含）。实测同一套文件，唯一差别是有没有 ENB：没 ENB 时接管/4× 照跑但 MV 探针 0.000 px / 0%，转镜头拖影；装了 ENB 是 [b]100% 非零[/b]、mean |mv| 7.56 px。你的 ENB 与预设原样保留
+[*]窗口模式 —— [b]必须无边框[/b]（独占全屏下接管会以 0x887a0001 失败并放弃）
+[*]显卡 —— NVIDIA [b]RTX 40 系或更新[/b]（DLSS-G 不会在更老的卡上加载）；实测 RTX 5060 Laptop 8 GB
+[*]驱动 —— 无硬性下限
+[*]ReShade —— 6.8（本包自带 DXGI.DLL）
+[*]系统 —— Windows 10 / 11 64 位
+[*]必须关闭 —— NVIDIA Smooth Motion、ENBFRAMEGENERATION.DLL，以及任何其它插帧/上采样层
+[*]管理器 —— 可选：MO2（复制进 OVERWRITE\ROOT）或不用管理器（跑 INSTALL.BAT）
+[/list]
+
+[b]性能。[/b]唯一的大开销是神经渲染：[b]约 24 ms/帧，占整帧 38–45%[/b]。应用侧掉到约 15 fps 以下时，把 MFG_FRAMES 降到 2（3×），或在 RESHADE.INI 里把 NRRESOLUTIONSCALE 设成 0.5（神经渲染降到约 7 ms）。8 GB 显存的卡在 2560×1600 下会贴近显存上限。屏上数字是[b]显示帧数[/b]（含生成帧），手感/延迟看日志里较低的那个应用侧数字。
+
+[b]Shout outs（致谢）[/b]
+[list]
+[*][b]crosire[/b] —— ReShade，本项目的立足点
+[*][b]Boris Vorontsov[/b] —— ENB，本 mod 的显示宿主
+[*][b]NVIDIA[/b] —— Streamline 与 NGX 运行时，帧生成的前提
+[*][b]Lecram[/b] —— RenoDX DLSS5，本项目所驱动的神经渲染引擎
+[*][b]dlss5-feed / dlss5-lab-overlay 的作者[/b] —— 上采样与 guide 桥接
+[*][b]Afzaal[/b] —— LumeniteFX Kernel（随包提供，前置 pass 已 stub；原文件以 LUMENITE_KERNEL.FX.ORIGINAL 一并包含）
+[*][b]Vortigern[/b] —— VORT 运动工具（MIT）
+[*][b]doodlum（StreamlineForENB）与 Community Shaders 团队[/b] —— 「直接挂引擎运动矢量渲染目标」这个思路的出处，本 mod 的运动矢量通路参照了它
+[*][b]SKSE 团队[/b] —— skse64，没有它什么都加载不了
+[/list]
+
+[b]授权：[/b]二次分发或整合包请先取得同意。[b]ENB 本体不入包[/b]（enbdev 明确禁止二次分发），请自行下载，也不要转载 ENB 的二进制文件。所有第三方组件遵循各自作者的授权。

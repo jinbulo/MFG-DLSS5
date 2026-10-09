@@ -1,0 +1,264 @@
+[size=6][b]FS4 MFG — Real Multi-Frame Generation + DLSS 5 Neural Rendering for Fallout 4[/b][/size]
+
+[size=5][b]Description[/b][/size]
+
+Fallout 4 has neither DLSS nor frame generation. This mod gives it both — for real.
+
+It builds its own D3D12 flip swapchain over the game's window and drives NVIDIA Streamline / DLSS-G itself, so the game gets [b]genuine multi-frame generation[/b] (2x / 3x / 4x / 5x / 6x) even though it has no DLSS support at all. The interpolated frames come from the driver's frame generator, not from a post-process filter.
+
+On top of that it wires [b]DLSS 5[/b] into the same chain: DLSS / DLAA upscaling and neural rendering come from [b]dlss5-feed[/b] + [b]renodx-dlss5 8.5[/b], and this mod feeds them the [b]engine's real TAA motion vectors[/b] — taken straight out of the game's own motion buffer, published to ReShade by [b]FO4ReShadeHelper[/b] and carried into the feed's guide chain — instead of optical flow. Optical flow has to guess; a geometric vector does not. In practice: motion reads exactly [b]0 px while you stand still[/b] and tens of px while you turn, with no outliers, so a fast camera turn no longer smears.
+
+The UI is handled properly too: [b]ui_exact[/b] (on by default) lifts the HUD, subtitles and dynamic bars out before the DLAA pass and composites their exact per-pixel contribution back afterwards — PRESENTED = SATURATE(DLAA(A) + B − A) — so the UI keeps its original pixels while the world still gets the upscaler. No mask, no threshold, no dilation, no edge bleed: any HUD, any resolution, translucency included.
+
+Nothing in your game folder is modified permanently. The installer backs up everything it overwrites, your ENB (if you use one) is left exactly as it is, and the layer turns off with one double-click.
+
+[b]Two builds have been tested end to end — these are the configurations we can vouch for:[/b]
+[list]
+[*][b]Fallout 4 v1.10.163[/b] (the pre-next-gen build) → F4SE [b]0.6.23[/b] + ENB [b]0.496[/b]. Verified: takeover OK, 4x (277 fps on screen / 69 fps application-side), ui_exact compositing, six consecutive motion probes 100% non-zero (0.016 → 20.127 px).
+[*][b]Fallout 4 v1.11.240[/b] (current Steam build) → F4SE [b]0.7.9[/b] + ENB [b]0.501[/b]. Verified: own swapchain created with 0x0, DONE, 4x (163 fps / 41 fps application-side), motion probes 41.7 / 35.1 / 0.67 px all 100% non-zero, ui_exact coverage 99.9% / 62.3%, no crashes.
+[/list]
+[b]Both versions need ENB — it is what makes the engine publish motion vectors.[/b] Measured on the same machine, same files, same add-on, only ENB added: motion probe 0.000 px, 0% non-zero without it → six consecutive probes [b]100% non-zero[/b] with it. Without ENB the layer still takes over and runs 4x, but the generated frames have no motion data and smear when you turn. ENB is [b]not[/b] bundled (the previous upload carried the author's own copy; that is gone) — download it yourself from [url=https://enbdev.com/]enbdev.com[/url].
+
+[b]Running a different build?[/b] The two above are what has been tested end to end. Everything else is untested rather than blocked: install the ENB and the F4SE that match your build, keep the window borderless, keep other frame-generation layers off, and try it. If something misbehaves, post the four logs and we can tell you exactly where it stands.
+
+[b]New in this release (2026-10-05)[/b]
+[list]
+[*][b]ui_exact — the UI no longer goes through the DLAA pass, and it is on by default.[/b] Previously the feed's DLAA ran on the finished frame (scene + HUD together), so the HUD was temporally reprojected with the world's motion vectors and came out soft. Now the add-on keeps the finished frame B, gives the upscaler the scene-only frame A, and composites the UI's exact per-pixel contribution back on top. Verified in free play: 100% of frames ran the whole path, and the scene-without-HUD frame was picked correctly in 29 of 30 sampled frames.
+[*][b]Removed HUDLESS_TAG=2/3.[/b] Handing DLSS-G a true HUD-less frame over a second shared bridge was measured twice on 2026-10-02 and was worse both while moving and while turning. The code is gone; the setting is a plain 0/1 again and anything ≥2 is clamped back to 1.
+[*][b]HUD-less detection fixed for Fallout 4.[/b] FO4 binds the back buffer without depth several times per frame; only the first of those is the post-processed scene before the HUD — the later ones are the finished frame itself. The capture point now takes the first. (Skyrim is the opposite — the last one is correct — so the same code needs a per-title rule.)
+[*][b]Installer / disable / restore scripts, bilingual (EN/CN).[/b] INSTALL.BAT finds your game folder by itself (drag &amp; drop → script folder → last used path → Bethesda registry → [b]every Steam library[/b], including ones on another drive), reads FALLOUT4.EXE's version first (anything that is not the expected build warns and asks you to type yes; anything else cancels and touches nothing), backs up every file it is about to overwrite into MFG-BACKUP-&lt;TIMESTAMP&gt;\, and elevates itself automatically for protected folders. MFG-DISABLE.BAT / MFG-ENABLE.BAT / RESTORE.BAT turn the layer off, back on, or remove it completely.
+[*][b]One more plugin added to the disable list.[/b] DLSS5-LAB-OVERLAY.ADDON64 used to keep loading even after "one-click disable" — it now renames along with the other five entry points, so disabling is complete.
+[*][b]Hotkeys unified:[/b] F8 toggles effects, F7 the overlay, F10 takes a screenshot (no Ctrl modifier). Seven unused bindings were dropped.
+[*]WIRE-SHOT.BAT writes into a SHOTS\ folder next to itself instead of a hard-coded path.
+[*][b]No more bundled ENB.[/b] The previous upload carried the author's own ENB (D3D11.DLL, ENBSERIES.INI, ENBLOCAL.INI). Those are gone from this archive — install your own ENB (0.496 / 0.501), and this pack will not overwrite it.
+[*]New [b]launch-f4se.bat[/b] and the bundled [b]DOWNGRADE-to-1.10.163.md[/b].
+[/list]
+
+[b]Known issues[/b]
+[list]
+[*]The geometry mask in the upscaler's guide chain is still required — [b]do not set GEOM_ENABLE=0[/b]. With it off, the guide chain trusts motion vectors that are not valid there and subtitles visibly blur.
+[*]The HUD is still interpolated inside [i]generated[/i] frames (that is DLSS-G's own HUD handling). UI_EXACT fixes the DLAA blur, not the interpolation.
+[*]Occasional multi-millisecond hitches on the copy, and rare multi-hundred-millisecond frames inside the DLSS feed. Under investigation.
+[/list]
+
+[line]
+
+[size=5][b]Installation instructions[/b][/size]
+
+[b]Step 0 — set up the game first[/b]
+
+[list=1]
+[*]Install Fallout 4 and let it reach the build you want: [b]1.10.163[/b] or [b]1.11.240[/b]. Check the version under FALLOUT4.EXE → PROPERTIES → DETAILS.
+[*]Install the matching [b]F4SE[/b] into the game root (the folder that contains FALLOUT4.EXE): [b]0.6.23[/b] for 1.10.163, [b]0.7.9[/b] for 1.11.240. Put the loader [i]and[/i] the version-specific dll (F4SE_1_10_163.DLL / F4SE_1_11_240.DLL) there. The loader will refuse to start if the version does not match.
+[*]Install [b]ENB[/b] in the game root: copy the wrapper's files (D3D11.DLL, ENBSERIES.INI, ENBLOCAL.INI and the .FX/.BMP files) in. Use [b]0.496[/b] for 1.10.163, [b]0.501[/b] for 1.11.240.
+[*][b]Turn OFF the FPS limiter in ENB:[/b] open ENBLOCAL.INI and set ENABLEFPSLIMIT=FALSE. Several ENB builds ship ENABLEFPSLIMIT=TRUE with FPSLIMIT=61.0, which pins your frame rate and makes the mod look like it does nothing.
+[*]In-game: set [b]Borderless[/b] windowed (see below), and turn [b]NVIDIA Smooth Motion[/b] off. It is frame generation too and the two will fight.
+[/list]
+
+[b]Borderless mode is mandatory[/b] — the layer must create its own swapchain on the game's window, and DXGI refuses that in exclusive fullscreen. Edit DOCUMENTS\MY GAMES\FALLOUT4\FALLOUT4PREFS.INI:
+[code][Display]
+bBorderless=1
+bFull Screen=0[/code]
+(Or set it in the in-game display options.) If the window does not fill your screen, pick your monitor's native resolution in the game's display options — then [b]do not switch back to Fullscreen[/b]. That is the single most common cause of "the mod stopped working".
+
+[b]Step 1 — install this mod. Pick ONE of the two paths:[/b]
+
+[b]A. No mod manager (recommended for most players — it backs everything up for you)[/b]
+[list=1]
+[*]Extract this archive to a folder [b]outside[/b] your game folder (the Desktop is fine).
+[*]Run [b]install.bat[/b], or drag your Fallout 4 folder onto it.
+[*]It searches for the game automatically, prints a warning and asks you to type yes if FALLOUT4.EXE's version is not the one this pack expects, then backs up every file it is about to overwrite into MFG-BACKUP-&lt;TIMESTAMP&gt;\ and copies the mod in. It re-opens itself as administrator if the game folder is not writable.
+[/list]
+
+[b]B. Mod Organizer 2[/b]
+[list=1]
+[*]Copy everything in this archive into your MO2 OVERWRITE\ROOT (that folder [i]is[/i] your game root). The .BAT/.PS1 scripts are ignored in this path — leave them in the archive.
+[*]MO2 users do not need INSTALL.BAT and do not get the automatic backup — keep your own copy of anything you overwrite.
+[/list]
+
+[b]Step 2 — finish line (both paths)[/b]
+[list=1]
+[*]Make sure DATA\F4SE\PLUGINS\FS4MVCAM.DLL ended up in &lt;YOUR GAME&gt;\DATA\F4SE\PLUGINS\. Path A does it for you; if you used MO2, put it there by hand. This plugin publishes the engine's camera pose and previous-frame pose — the mod needs it. (On 1.11.240, see the note below.)
+[*]Launch the game (see [b]How to launch[/b]).
+[*]Once you are in the world, turn the camera left and right for a moment — that is what makes the motion-vector path light up.
+[/list]
+
+[b]How to launch[/b]
+[list]
+[*][b]v1.10.163:[/b] start with F4SE_LOADER.EXE — or double-click the bundled LAUNCH-F4SE.BAT, which does the same thing. Launching from Steam works as well: point Steam's launch option at F4SE_LOADER.EXE so the script extender actually loads, and be aware that Steam's plain Play button can update the game back to 1.11.240. What matters is the version sitting in the game folder, so set the update policy to [i]Properties → Updates → Only update this game when I launch it[/i] and check it occasionally.
+[*][b]v1.11.240:[/b] Steam's Play button or F4SE_LOADER.EXE both work (you are already on the newest build, so nothing can be "updated away"). Borderless mode is still mandatory.
+[/list]
+
+[b]Verify it is working — three lines:[/b]
+[list]
+[*]FS4MFG.LOG — OURSC / DONE, and the every-frame-presented count shows the multiplier you asked for
+[*]RESHADE.LOG — NR-VERDICT ... STATE=ENGAGED
+[*]DLSS5-FEED.LOG — MV PROBE ... MEAN |MV| reads tens of px while you move, [b]100% non-zero[/b]
+[/list]
+
+[b]Turning it off / removing it[/b]
+[list]
+[*][b]mfg-disable.bat[/b] — turn the layer off for now (fully reversible). It only renames this layer's entry points to .OFF — DXGI.DLL, FS4MFG.ADDON64, DLSS5-FEED.ADDON64, RENODX-DLSS5.ADDON64, FO4RESHADEHELPER.ADDON64, DLSS5-LAB-OVERLAY.ADDON64. Nothing is deleted, and the game immediately returns to its normal present path.
+[*][b]mfg-enable.bat[/b] — turn it back on.
+[*][b]restore.bat[/b] — uninstall: put the backed-up originals back and delete what this pack added. It keeps the backup folder; delete that yourself once you are happy.
+[*]ENABLED=0 in FS4MFG.INI also makes the layer passive without moving any file.
+[/list]
+After installing with INSTALL.BAT these scripts are also copied into &lt;GAME&gt;\MFG-TOOLS\.
+
+[b]Logs.[/b] All in the [b]game root[/b]: [b]fs4mfg.log[/b] (takeover, slInit, frame generation, ui_exact, depth/motion vectors), [b]dlss5-feed.log[/b] (work resolution, MV probe, depth probe, GPU cost), [b]ReShade.log[/b] (ReShade + RenoDX, NR-VERDICT), [b]sl.log[/b] (Streamline/DLSS-G). Attach all four when asking for help. LOG_PATH in FS4MFG.INI ships empty, so the log is written next to the add-on; if a mod manager's virtual file system interferes with writes, point it somewhere outside the game, e.g. LOG_PATH=D:\MFG-LOG\FS4MFG.LOG.
+
+[b]Changing game version.[/b] The full recipe with Steam console depot commands is in the bundled [b]DOWNGRADE-to-1.10.163.md[/b] (steam://open/console, four DOWNLOAD_DEPOT lines, copy the results over the game folder, swap F4SE to 0.6.23 and ENB to 0.496). [b]After a downgrade, remove the next-gen leftovers:[/b] DATA\ still holds Creation Club files and FALLOUT4 - TEXTURESPATCH.BA2 from the next-gen update; they are BTDX v7/v8 archives that a 1.10.163 engine cannot read and they can crash the game during startup. Moving those 26 files away was the exact fix for an early "the game dies seconds in" report. To go back up: Steam → Properties → Installed Files → Verify integrity, then F4SE 0.7.9 + ENB 0.501.
+
+[line]
+
+[size=5][b]Main features[/b][/size]
+
+[list]
+[*][b]Real frame generation, 1x–6x.[/b] MFG_FRAMES selects 2x / 3x / 4x / 5x / 6x (1 = 2x, 2 = 3x, 3 = 4x … 5 = 6x). Verified: 2560x1600 at native iSize, ~277 fps on screen = ~69 fps application-side x4 (1.10.163), and ~163 fps = ~41 fps x4 (1.11.240).
+[*][b]DLSS / DLAA upscaling and DLSS 5 neural rendering[/b], both fed by the [b]engine's real TAA motion vectors[/b] (FO4RESHADEHELPER → FS4MFG_MVFEED.FX → the feed's guide chain). One writer, constant units, no double-peak.
+[*][b]Real depth and real camera.[/b] The game's own D24S8 depth buffer is converted to R32_FLOAT, and the camera pair comes from the engine's own previous-frame pose (FS4MVCAM.DLL) rather than an estimated one.
+[*][b]The UI stays pixel-exact (UI_EXACT, on by default).[/b] HUD, subtitles and dynamic bars are lifted out before the DLAA pass and composited back afterwards, so they keep their original pixels while the world still gets the upscaler. Turn it off with UI_EXACT=0 to compare.
+[*][b]Works with renodx-dlss5 8.5.[/b] That version's neural rendering refuses every frame unless its internal compute-state shadow lands on the right command-list world; START_AFTER_PRESENTS=150 in FS4MFG.INI is what makes it land correctly. [b]Do not lower it.[/b]
+[*][b]One-click off, separate log, on-screen frame counter[/b] (STATS_WINDOW=1; ENABLED=0 for a passive layer without renaming anything).
+[*][b]Cleaned-up shader chain.[/b] The LumeniteFX Kernel pre-pass is replaced by a stub, because this mod overwrites the flow texture it produces every frame; the original file ships next to it as LUMENITE_KERNEL.FX.ORIGINAL if you want it back. Leave GEOM_ENABLE on.
+[*][b]Safe by construction.[/b] Your ENB is never touched, every install is preceded by an automatic backup, and uninstall restores the originals byte-for-byte (verified in a sandbox: 1 overwritten / 4 added, disable → enable → restore with matching file bytes).
+[/list]
+
+[line]
+
+[size=5][b]Requirements[/b][/size]
+
+[list]
+[*][b]Game —[/b] Fallout 4 [b]v1.10.163[/b] or [b]v1.11.240[/b]. These two are the tested builds; on anything else, install the ENB and F4SE that match your build and give it a try.
+[*][b]Script extender —[/b] F4SE [b]0.6.23[/b] for 1.10.163, F4SE [b]0.7.9[/b] for 1.11.240. Version must match the game exactly.
+[*][b]Host — ENB is REQUIRED[/b] on both builds. Not bundled — download it yourself from [url=https://enbdev.com/]enbdev.com[/url]. Use [b]0.496[/b] for 1.10.163 and [b]0.501[/b] for 1.11.240. Measured on the same install with the same add-on, only ENB added:
+[list]
+[*]no ENB → takeover and 4x still work, but the motion-vector probe reads 0.000 px, 0% non-zero (twice) and generated frames smear when you move
+[*]with ENB → six consecutive probes [b]100% non-zero[/b], values tracking the camera: 0.016 → 2.07 → 3.61 → 20.13 px
+[/list]
+This pack does not ship and does not overwrite D3D11.DLL / ENBSERIES.INI / ENBLOCAL.INI.
+[*][b]Window mode — borderless windowed is mandatory.[/b] In exclusive fullscreen the layer's second swapchain fails with CreateSwapChainForHwnd → 0x887a0001 and the layer gives up after three tries, leaving the game untouched. Borderless fixes it immediately.
+[*][b]GPU —[/b] NVIDIA [b]RTX 40-series or newer[/b]. DLSS-G will not load on anything older. Developed and verified on an RTX 5060 Laptop.
+[*][b]Driver —[/b] no hard minimum. The bundled NVNGX_DLSSNR.DLL declares "minimum driver 615.00" in its log line, but that is a declaration only — 581.15 runs it fine.
+[*][b]ReShade —[/b] 6.8, bundled as DXGI.DLL. Do not mix in another ReShade install.
+[*][b]OS —[/b] Windows 10 / 11, 64-bit.
+[*][b]Must be off —[/b] NVIDIA Smooth Motion, and any other frame-generation / upscaling layer (ENBFrameGeneration.dll, OptiScaler, Lossless Scaling…). Only one presentation layer can own the window.
+[*][b]Mod manager —[/b] optional. MO2 (copy into OVERWRITE\ROOT) or no manager at all (run INSTALL.BAT). ENB is not required to be bundled — you install it yourself.
+[/list]
+
+[b]Note on v1.11.240:[/b] FS4MVCAM.DLL is built against the F4SE 0.6.x plugin interface, so F4SE 0.7.9 refuses it and F4SE.LOG says PLUGIN FS4MVCAM.DLL (00000000 00000000) NO VERSION DATA. This is known and harmless on 1.11.240: motion vectors there come from ENB + the engine's own buffer, verified 100% non-zero. Nothing to fix, and it does not affect takeover or frame generation. (A 0.7.9-interface rebuild is on the wishlist, not required.)
+
+[b]Performance.[/b] Neural rendering is the one big cost: about [b]22–28 ms per frame, 40–65% of the frame[/b]. NR's own "Faster" option (NRRESOLUTIONSCALE=0.5 in RESHADE.INI) cuts that to roughly 7 ms. The on-screen number counts [i]displayed[/i] frames including generated ones, so input latency follows the lower, application-side number in the log — lower the resolution or lower MFG_FRAMES if the game feels laggy.
+
+[line]
+
+[size=5][b]Shout outs[/b][/size]
+
+[list]
+[*][b]crosire[/b] — ReShade, the add-on API this is built on.
+[*][b]Boris Vorontsov[/b] — ENB, which this mod uses as its display host.
+[*][b]NVIDIA[/b] — Streamline and the NGX runtimes that make DLSS-G possible.
+[*][b]Lecram[/b] — RenoDX DLSS5, the neural-rendering engine this project feeds.
+[*][b]The dlss5-feed / dlss5-lab-overlay authors[/b] — the upscaler and guide bridge.
+[*][b]Afzaal[/b] — LumeniteFX Kernel (shipped here with its pre-pass stubbed out; the original is included as LUMENITE_KERNEL.FX.ORIGINAL).
+[*][b]Vortigern[/b] — VORT motion tools (MIT).
+[*][b]The Fallout New Vegas ReShade helper project[/b] — the add-on-side buffer-publishing pattern that FO4RESHADEHELPER was modelled on.
+[*][b]The F4SE team[/b] — f4se, without which none of this loads.
+[/list]
+
+[size=5][b]Permissions[/b][/size]
+Ask before re-uploading or including this in another collection. [b]ENB is not bundled[/b] — download it from enbdev.com yourself, and do not re-post ENB's binaries anywhere. All third-party components remain under their authors' own terms.
+
+[line]
+
+[size=5][b]中文版（速览）[/b][/size]
+
+[b]Description（简介）[/b]
+
+《辐射4》既没有 DLSS 也没有帧生成。这个 mod 把两样都给你，而且是真的。
+
+它在游戏窗口上自建一条 D3D12 交换链，自己驱动 NVIDIA Streamline / DLSS-G，于是游戏在完全不支持 DLSS 的情况下拿到了[b]真正的多帧生成[/b]（2× / 3× / 4× / 5× / 6×）—— 中间帧是驱动级帧生成器产出的，不是后处理滤镜糊出来的。
+
+同时把 [b]DLSS 5[/b] 接进同一条链：DLSS / DLAA 上采样与神经渲染由 [b]dlss5-feed[/b] + [b]renodx-dlss5 8.5[/b] 提供，而本 mod 把[b]引擎真实的 TAA 运动矢量[/b]（直接取自游戏自己的运动缓冲，由 FO4RESHADEHELPER 发布、再接进 feed 的 guide 链）喂给它们，而不是让它们去猜光流。光流必须猜；几何矢量不用。[b]实测：静止时精确 0 px、转身时数十 px，没有离群值[/b]，快速转身不再抹糊。
+
+UI 也做了处理：[b]ui_exact[/b]（默认开启）在 DLAA 之前把 HUD、字幕与动态数据条摘出来、之后把 UI 的逐像素真实贡献合回去 —— PRESENTED = SATURATE(DLAA(A) + B − A) —— 于是它们保持自己的像素，而风景照旧吃上采样。没有掩膜、没有阈值、没有膨胀、没有边缘泄漏：任何 HUD、任何分辨率、半透明也精确。
+
+[b]已实测跑通的是下面两个组合（其它版本未测试：装好对应版本的 ENB 与 F4SE 后可自行尝试）：[/b]
+[list]
+[*]Fallout 4 [b]1.10.163[/b] → F4SE [b]0.6.23[/b] + ENB [b]0.496[/b]（实测接管成功、4×：屏幕 277 fps / 应用 69 fps、ui_exact 合成、连续 6 个 MV 探针 100% 非零 0.016→20.127 px）
+[*]Fallout 4 [b]1.11.240[/b]（Steam 当前版）→ F4SE [b]0.7.9[/b] + ENB [b]0.501[/b]（实测接管 0x0 成功、4×：163 fps / 应用 41 fps、MV 41.7 / 35.1 / 0.67 px 均 100% 非零、ui_exact 覆盖 99.9% / 62.3%、无崩溃）
+[/list]
+[b]两个版本都必须装 ENB[/b]（运动矢量的前提）：同一台机器、同一套文件、同一支 addon，唯一差别是有没有 ENB —— 没 ENB 时 MV 探针 0.000 px / 0%，装了 ENB 连续 6 个探针 [b]100% 非零[/b]。没 ENB 也能接管出 4 倍帧，但插值帧没有运动信息、转镜头拖影。ENB [b]不随包提供[/b]（上一版带的是作者自己的 ENB，这一版已全部移除），请自行到 enbdev.com 下载（1.10.163 → 0.496；1.11.240 → 0.501）。
+
+[b]本版更新（2026-10-05）：[/b]UI 不再经过 DLAA（新增 UI_EXACT、默认开启）；移除 HUDLESS_TAG=2/3（实测两次负收益，代码已删，写 ≥2 会被钳回 1）；修好辐射 4 的「无 HUD 帧」抓取点（FO4 一帧里多次绑定后缓冲，只有第一次才是后处理已完、HUD 未画）；安装/停用/还原脚本中英双语并自动查找游戏、备份、提权；一键停用补上 DLSS5-LAB-OVERLAY.ADDON64；快捷键统一（F8 效果、F7 覆盖层、F10 截图）；WIRE-SHOT.BAT 改存脚本旁边的 SHOTS\；不再附带 ENB；新增 LAUNCH-F4SE.BAT 与 DOWNGRADE-TO-1.10.163.MD。
+
+[b]Known issues（已知问题）[/b]
+[list]
+[*]上采样器 guide 链的几何掩膜仍然必需 —— [b]不要把 GEOM_ENABLE 改成 0[/b]，关掉之后 guide 链会相信那些本来不成立的运动矢量，字幕实测立刻变糊。
+[*]生成帧里的 HUD 仍会被一起插值（那是 DLSS-G 自己的 HUD 处理）。UI_EXACT 解决的是 DLAA 造成的发糊，不是插帧。
+[*]搬运偶发毫秒级卡顿，喂帧插件内偶发数百毫秒级单帧，原因仍在查。
+[/list]
+
+[b]Installation instructions（安装）[/b]
+
+0. 先装好 Fallout 4（[b]1.10.163[/b] 或 [b]1.11.240[/b]）与配对版本的 [b]F4SE[/b]（0.6.23 / 0.7.9，loader 与版本 dll 都放进游戏根目录）。
+1. 装 [b]ENB[/b]（1.10.163 → 0.496；1.11.240 → 0.501，enbdev.com），wrapper 文件放进游戏根目录；把 ENBLOCAL.INI 里的 ENABLEFPSLIMIT 改成 FALSE（不然帧率会被钉在 61）。
+2. 设[b]无边框窗口[/b]（BBORDERLESS=1 + BFULL SCREEN=0，改 文档\MY GAMES\FALLOUT4\FALLOUT4PREFS.INI 或游戏内显示设置），并关掉 [b]NVIDIA Smooth Motion[/b]。
+3. 安装本 mod，两条路选一条：
+[list]
+[*][b]A（推荐）不用管理器：[/b]把压缩包解到[b]游戏目录之外[/b]，双击 INSTALL.BAT（或把游戏目录拖上去）。它会自己找目录、核对版本、把会被覆盖的文件先备份到 MFG-BACKUP-&lt;时间戳&gt;\，再复制进去；写不进去会自动提权。
+[*][b]B 用 MO2：[/b]把包内文件复制进 MO2\OVERWRITE\ROOT（= 游戏根目录），脚本可以不管。
+[/list]
+4. 确认 DATA\F4SE\PLUGINS\FS4MVCAM.DLL 到位（A 路自动完成；B 路需手动）。它负责发布引擎的相机位姿与上一帧位姿。
+5. 启动：推荐 F4SE_LOADER.EXE（或包里的 LAUNCH-F4SE.BAT，双击即可）。直接点 Steam 的「开始游戏」也能启动 —— 把 Steam 的启动项指到 F4SE_LOADER.EXE 就能带上脚本扩展。1.10.163 唯一要防的是 Steam 自动更新回 1.11.240：在 属性 → 更新 里选「仅在我启动此游戏时更新」。无论如何都必须无边框。
+
+[b]验证是否正常（三行）：[/b]FS4MFG.LOG 里 OURSC/DONE 且每帧实际呈现数 = 你设的倍数；RESHADE.LOG 里 NR-VERDICT ... STATE=ENGAGED；DLSS5-FEED.LOG 里 MV PROBE 移动时有几十 px 且 100% 非零。
+
+[b]停用 / 启用 / 卸载：[/b]MFG-DISABLE.BAT 暂时关（只把 6 个入口文件改成 .OFF，不删任何东西）；MFG-ENABLE.BAT 开回来；RESTORE.BAT 彻底卸载并把备份放回。FS4MFG.INI 里 ENABLED=0 也能让它完全不动渲染、且不用改文件名。装过 INSTALL.BAT 后这些脚本也会被复制到 &lt;游戏目录&gt;\MFG-TOOLS\。
+
+[b]日志（排错时一起发）：[/b]都在[b]游戏根目录[/b]：FS4MFG.LOG（接管、slInit、帧率/倍率、ui_exact、深度与运动矢量）、DLSS5-FEED.LOG（工作分辨率、MV 探针、深度探针、GPU 耗时）、RESHADE.LOG（ReShade 与 RenoDX、NR-VERDICT）、SL.LOG（Streamline / DLSS-G）。LOG_PATH 默认为空（日志写在插件旁边）；若管理器虚拟文件系统干扰写盘，把它指到游戏目录之外。
+
+[b]Main features（核心功能）[/b]
+[list]
+[*][b]真正的帧生成，1×–6×。[/b]MFG_FRAMES：1 = 2×，2 = 3×，3 = 4× … 5 = 6×。实测：2560×1600、iSize 原生下，屏幕约 277 fps = 应用侧约 69 fps × 4（1.10.163）；约 163 fps = 约 41 fps × 4（1.11.240）。
+[*][b]DLSS / DLAA 上采样 + DLSS 5 神经渲染[/b]，两者都由引擎真矢量驱动（FO4RESHADEHELPER → FS4MFG_MVFEED.FX → feed 的 guide 链）。单写者、恒定单位、无双峰。
+[*][b]真深度 + 真相机。[/b]游戏自己的 D24S8 深度转成 R32_FLOAT；相机对来自引擎自己的上一帧位姿（FS4MVCAM.DLL），不是估出来的。
+[*][b]UI 保持原像素（UI_EXACT，默认开）。[/b]HUD、字幕与动态数据条在进 DLAA 之前就被摘出来、之后原样合回。关掉用 UI_EXACT=0。
+[*][b]与 renodx-dlss5 8.5 兼容。[/b] 8.5 的神经渲染要求它的 compute-state 影子落在正确的命令列表世界，否则每一帧都会被拒。FS4MFG.INI 里的 START_AFTER_PRESENTS=150 就是干这个的，[b]不要调小[/b]。
+[*][b]一键停用、独立日志、屏上帧数读数[/b]（STATS_WINDOW=1；ENABLED=0 让整层被动而不改文件名）。
+[*][b]清理过的着色器链。[/b]LumeniteFX Kernel 的前置 pass 已被 stub 替换（因为本 mod 每帧都会覆盖它产出的光流纹理），原文件以 LUMENITE_KERNEL.FX.ORIGINAL 随包提供。保持 GEOM_ENABLE 开启。
+[*][b]安全。[/b]不动你的 ENB；安装前一定先备份；卸载会把原文件按字节放回（沙盒实测：覆盖 1、新增 4，disable → enable → restore 后文件字节一致）。
+[/list]
+
+[b]Requirements（需求）[/b]
+[list]
+[*]游戏 —— Fallout 4 [b]1.10.163[/b] 或 [b]1.11.240[/b]（这两个是实测版本；其它版本未测试，装好对应版本的 ENB 与 F4SE 后可自行尝试）
+[*]脚本扩展 —— F4SE [b]0.6.23[/b]（1.10.163）/[b]0.7.9[/b]（1.11.240），必须配对
+[*]宿主 —— [b]必须装 ENB[/b]：1.10.163 → [b]0.496[/b]；1.11.240 → [b]0.501[/b]（enbdev.com 自行下载，本包不含）。实测同一套文件，唯一差别是有没有 ENB：没 ENB 时接管/4× 照跑但 MV 探针 0.000 px / 0%，转镜头拖影；装了 ENB 连续 6 个探针 [b]100% 非零[/b]
+[*]窗口模式 —— [b]必须无边框[/b]（独占全屏下接管会在 STEP4 以 0x887a0001 失败并放弃）
+[*]显卡 —— NVIDIA [b]RTX 40 系或更新[/b]（DLSS-G 不会在更老的卡上加载）；实测 RTX 5060 Laptop
+[*]驱动 —— 无硬性下限（包内 NVNGX_DLSSNR.DLL 日志里写 "minimum driver 615.00"，但那只是声明，实测 581.15 也能跑）
+[*]ReShade —— 6.8（本包自带 DXGI.DLL）
+[*]系统 —— Windows 10 / 11 64 位
+[*]必须关闭 —— NVIDIA Smooth Motion，以及任何其它插帧/上采样层
+[*]管理器 —— 可选：MO2（复制进 OVERWRITE\ROOT）或不用管理器（跑 INSTALL.BAT）
+[/list]
+
+[b]1.11.240 补充说明：[/b]FS4MVCAM.DLL 是按 F4SE 0.6.x 插件接口编的，F4SE 0.7.9 会拒绝加载它（F4SE.LOG 里写 NO VERSION DATA）。这是已知现象且无害：1.11.240 上运动矢量由 ENB + 引擎自己的缓冲提供，实测 100% 非零，不影响接管与帧生成。（给 0.7.9 重编一版在愿望单上，但不是必需。）
+
+[b]性能。[/b]唯一的大开销是神经渲染：[b]约 22–28 ms/帧，占整帧 40–65%[/b]。用 NR 自带的 "Faster"（RESHADE.INI 里 NRRESOLUTIONSCALE=0.5）可降到约 7 ms。屏上数字是显示帧数（含生成帧），手感/延迟看日志里较低的那个应用侧数字 —— 觉得卡就降分辨率或降 MFG_FRAMES。
+
+[b]Shout outs（致谢）[/b]
+[list]
+[*][b]crosire[/b] —— ReShade，本项目的立足点
+[*][b]Boris Vorontsov[/b] —— ENB，本 mod 的显示宿主
+[*][b]NVIDIA[/b] —— Streamline 与 NGX 运行时，帧生成的前提
+[*][b]Lecram[/b] —— RenoDX DLSS5，本项目所驱动的神经渲染引擎
+[*][b]dlss5-feed / dlss5-lab-overlay 的作者[/b] —— 上采样与 guide 桥接
+[*][b]Afzaal[/b] —— LumeniteFX Kernel（随包提供，前置 pass 已 stub；原文件以 LUMENITE_KERNEL.FX.ORIGINAL 一并包含）
+[*][b]Vortigern[/b] —— VORT 运动工具（MIT）
+[*][b]Fallout New Vegas ReShade helper 项目[/b] —— FO4RESHADEHELPER 的「插件侧发布缓冲」思路参照了它
+[*][b]F4SE 团队[/b] —— f4se，没有它什么都加载不了
+[/list]
+
+[b]授权：[/b]二次分发或整合包请先取得同意。[b]ENB 本体不入包[/b]（enbdev 明确禁止二次分发），请自行下载，也不要转载 ENB 的二进制文件。所有第三方组件遵循各自作者的授权。

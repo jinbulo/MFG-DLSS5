@@ -1,0 +1,8 @@
+# Release binaries are published as GitHub Release assets, not committed.
+*.zip
+*.7z
+*.rar
+
+# Local scratch
+tools/_local/
+*.log
